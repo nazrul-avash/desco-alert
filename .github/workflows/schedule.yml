@@ -2,8 +2,8 @@ name: DESCO Balance Alert
 
 on:
   schedule:
-    # Runs every hour at :00 (UTC). Bangladesh is UTC+6, so this covers all hours.
-    - cron: "0 * * * *"
+    # 14:00 UTC is exactly 8:00 PM Bangladesh Standard Time (BST)
+    - cron: "0 14 * * *"
 
   # Allow manual trigger from GitHub Actions tab (useful for testing)
   workflow_dispatch:
