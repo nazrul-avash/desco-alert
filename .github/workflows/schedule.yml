@@ -37,7 +37,8 @@ jobs:
         env:
           DESCO_ACCOUNT_NO: ${{ secrets.DESCO_ACCOUNT_NO }}
           BALANCE_THRESHOLD: ${{ secrets.BALANCE_THRESHOLD }}
-          WHATSAPP_RECIPIENTS: ${{ secrets.WHATSAPP_RECIPIENTS }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_RECIPIENTS: ${{ secrets.TELEGRAM_RECIPIENTS }}
           # Use manual input if triggered manually, otherwise default to "false"
           ALWAYS_NOTIFY: ${{ github.event.inputs.always_notify || 'false' }}
         run: python main.py
