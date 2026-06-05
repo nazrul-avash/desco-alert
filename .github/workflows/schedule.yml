@@ -1,0 +1,43 @@
+name: DESCO Balance Alert
+
+on:
+  schedule:
+    # Runs every hour at :00 (UTC). Bangladesh is UTC+6, so this covers all hours.
+    - cron: "0 * * * *"
+
+  # Allow manual trigger from GitHub Actions tab (useful for testing)
+  workflow_dispatch:
+    inputs:
+      always_notify:
+        description: "Send status even if balance is OK?"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+
+jobs:
+  check-balance:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Run DESCO balance checker
+        env:
+          DESCO_ACCOUNT_NO: ${{ secrets.DESCO_ACCOUNT_NO }}
+          BALANCE_THRESHOLD: ${{ secrets.BALANCE_THRESHOLD }}
+          WHATSAPP_RECIPIENTS: ${{ secrets.WHATSAPP_RECIPIENTS }}
+          # Use manual input if triggered manually, otherwise default to "false"
+          ALWAYS_NOTIFY: ${{ github.event.inputs.always_notify || 'false' }}
+        run: python main.py
