@@ -1,42 +1,50 @@
 import requests
+import urllib3
 from datetime import datetime, date
 
-BASE_URL = "https://prepaid.desco.org.bd/api"
-HEADERS = {"Accept": "application/json, text/plain, */*"}
+# Suppress the insecure request warnings caused by disabling SSL verification
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
+BASE_URL = "https://prepaid.desco.org.bd/api"
+
+# Emulate a real desktop browser request signature
+HEADERS = {
+    "Accept": "application/json, text/plain, */*",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+    "Origin": "https://prepaid.desco.org.bd",
+    "Referer": "https://prepaid.desco.org.bd/"
+}
 
 def _get(path: str, params: dict) -> dict | None:
-    """Try unified first, then tkdes. Returns data dict or None."""
+    """Tries unified first, then tkdes. Gracefully bypasses SSL quirks."""
     for meter_type in ["unified", "tkdes"]:
         url = f"{BASE_URL}/{meter_type}/{path}"
         try:
-            resp = requests.get(url, params=params, headers=HEADERS, timeout=10)
-            resp.raise_for_status()
-            body = resp.json()
-            if body.get("code") == 200 and body.get("data"):
-                return body["data"]
+            # Added verify=False to bypass utility certificate validation errors
+            resp = requests.get(url, params=params, headers=HEADERS, timeout=15, verify=False)
+            
+            if resp.status_code == 200:
+                body = resp.json()
+                # Flexibly grab the data payload directly if it exists
+                if "data" in body and body["data"]:
+                    return body["data"]
+                    
         except Exception as e:
-            print(f"[WARN] {meter_type} request failed: {e}")
+            print(f"[WARN] {meter_type} attempt failed on endpoint {path}: {e}")
+            
     return None
 
 
 def get_balance(account_no: str) -> dict | None:
-    """
-    Returns dict with keys:
-      balance, currentMonthConsumption, readingTime, meterNo
-    or None on failure.
-    """
-    data = _get("customer/getBalance", {"accountNo": account_no})
-    return data
+    """Fetches real-time meter balance array structures."""
+    return _get("customer/getBalance", {"accountNo": account_no})
 
 
 def get_monthly_consumption(account_no: str) -> dict | None:
-    """
-    Returns this month's consumption record or None.
-    """
+    """Returns this month's or the previous month's usage summary."""
     today = date.today()
     month_str = today.strftime("%Y-%m")
-    # fetch last 2 months just in case current month has no data yet
+    
     prev_month = today.replace(day=1)
     if prev_month.month == 1:
         prev_month = prev_month.replace(year=prev_month.year - 1, month=12)
@@ -51,29 +59,19 @@ def get_monthly_consumption(account_no: str) -> dict | None:
     if not data:
         return None
 
-    # data is a list; grab the most recent entry
     records = data if isinstance(data, list) else [data]
     records.sort(key=lambda r: r.get("month", ""), reverse=True)
     return records[0] if records else None
 
 
 def build_report(account_no: str, balance_threshold: float) -> dict:
-    """
-    Returns a report dict:
-      {
-        "balance": float,
-        "is_low": bool,
-        "month": str,
-        "consumed_unit": float,
-        "consumed_taka": float,
-        "reading_time": str,
-        "error": str | None
-      }
-    """
+    """Compiles the metrics together into a structured notification report."""
     balance_data = get_balance(account_no)
 
     if not balance_data:
-        return {"error": "Could not fetch balance from DESCO API. The server may be down."}
+        return {
+            "error": "Unable to extract meter data payload. Your account number might be invalid for both endpoints, or GitHub's server region is currently geo-blocked by DESCO's hosting firewall."
+        }
 
     balance = float(balance_data.get("balance", 0))
     reading_time = balance_data.get("readingTime", "N/A")
